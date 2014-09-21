@@ -1,9 +1,3 @@
----
-title: "Practical_Machine_Learning_Project"
-author: ""
-date: "September 21, 2014"
-output: html_document
----
 #Getting and Cleaning Data
 Download the training and testing data sets and remove the columns with non-related infomation and invalid columns with more than 95% missing values.
 
