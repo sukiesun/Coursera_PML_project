@@ -1,0 +1,94 @@
+---
+title: "Practical_Machine_Learning_Project"
+author: "Sukie Sun"
+date: "September 21, 2014"
+output: html_document
+---
+#Getting and Cleaning Data
+Download the training and testing data sets and remove the columns with non-related infomation and invalid columns with more than 95% missing values.
+
+```{r}
+library(caret)
+#download data sets
+train<-read.csv("./train.csv")
+test<-read.csv("./test.csv")
+#remove non-related columns
+training <- train[,7:dim(train)[2]]
+testing <- test[,7:dim(test)[2]]
+##remove invalid columns with more than 95% missing values, learned from http://mlarocca.github.io/07-23-2014/analysis.html
+threshold <- dim(train)[1]*0.95
+goodColumns <- !apply(training, 2, function(x) sum(is.na(x)) > threshold  || sum(x=="") > threshold)
+training <- training[,goodColumns]
+
+badColumns <- nearZeroVar(training, saveMetrics = TRUE)
+training <- training[, badColumns$nzv==FALSE]
+```
+
+#Data Slicing and Cross Validation 
+Assign data rows into training set and crossv alication set
+
+```{r}
+inTrain <- createDataPartition(training$classe, p = 0.7)[[1]]
+cv_train <- training[inTrain,]
+cv_test <- training[-inTrain,]
+
+inTrain <- createDataPartition(cv_test$classe, p = 0.7)[[1]]
+cv_training <- cv_train[inTrain,]
+cv_testing <- cv_test[inTrain,]
+
+testing <- testing[, goodColumns]
+testing$classe <- NA
+testing <- testing[, badColumns$nzv==FALSE]
+```
+
+#Model Training
+Training models using method "rf", "gbm" and "lda". Give up method "rf" here because the performance is not good in this case.
+
+```{r}
+##Train 3 different models
+#mod1 <- train(classe ~ ., data=cv_train, method="rf")
+mod2 <- train(classe ~ ., data=cv_train, method="gbm")
+mod3 <- train(classe ~ ., data=cv_train, method="lda")
+
+#pred1 <- predict(mod1, cv_test)
+pred2 <- predict(mod2, cv_test)
+pred3 <- predict(mod3, cv_test)
+
+#confusionMatrix(pred1, crossv$classe)
+confusionMatrix(pred2, crossv$classe)
+confusionMatrix(pred3, crossv$classe)
+
+predDF <- data.frame(pred2, pred3, classe=cv_train$classe)
+
+combModFit <- train(classe ~ ., method="rf", data=predDF)
+```
+
+#Prediction error
+
+```{r}
+#in-sample error
+combPredIn <- predict(combModFit, predDF)
+confusionMatrix(combPredIn, predDF$classe)
+
+#out-of-sample error
+#pred1 <- predict(mod1, cv_testing)
+pred2 <- predict(mod2, cv_testing)
+pred3 <- predict(mod3, cv_testing)
+predDF <- data.frame(pred1,pred2, pred3, classe=cv_testing$classe)
+
+combPredOut <- predict(combModFit, predDF)
+confusionMatrix(combPredOut, predDF$classe)
+```
+
+#Write the Prediction Results
+```{r}
+pml_write_files = function(x){
+        n = length(x)
+        for(i in 1:n){
+                filename = paste0("problem_id_",i,".txt")
+                write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+        }
+}
+
+pml_write_files(combPred)
+```
